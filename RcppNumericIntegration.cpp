@@ -1,9 +1,7 @@
 #include <Rcpp.h>
 #include <vector>
 #include <assert.h>
-
 using namespace Rcpp;
-
 
 // [[Rcpp::plugins(cpp11)]]
 // [[Rcpp::depends(BH)]]
@@ -24,13 +22,11 @@ inline int n2(const double &n, const double &p, const double &k, const double &z
 
 // [[Rcpp::export]]
 NumericMatrix ItteratorNP(NumericMatrix input, const double &z1, const double &z2, const int &ngen ){
-  
   int k = input.nrow();
-  NumericMatrix output(k,k);
+  assert (k == input.ncol());
   
   std::vector<std::vector<double>> invec(k, std::vector<double>(k));
   std::vector<std::vector<double>> outvec(k, std::vector<double>(k,0.0));
-  
   
   for(int i = 0; i < k; ++i){
     for(int j = 0; j < k; ++j){
@@ -62,6 +58,7 @@ NumericMatrix ItteratorNP(NumericMatrix input, const double &z1, const double &z
     }   
   }
   
+  NumericMatrix output(k,k);
   
   for(int i = 0; i < k; ++i){
     for(int j = 0; j < k; ++j){
@@ -69,30 +66,5 @@ NumericMatrix ItteratorNP(NumericMatrix input, const double &z1, const double &z
     }
   }
   
-    
   return output;
 }
-
-/*
-// [[Rcpp::export]]
-NumericMatrix Solve(const int n1, const int n2, const double z1, const double z2, const double k) {
-
-  std::vector<std::vector<double> > input(k, std::vector<double>(k,0.0));
-  std::vector<std::vector<double> > output(k, std::vector<double>(k,0.0));
-  
-  input[n1][n2] = 1.0;
-    
-  ItteratorNP(input, output, k, z1, z2);
-  
-  NumericMatrix outR(k, k);
-  
-  for(int i = 0; i < k; ++i){
-    for(int j = 0; j < k; ++j){
-      outR(i,j) = output[i][j];
-    }
-  }
-  
-  return outR;
-}
- */
-
