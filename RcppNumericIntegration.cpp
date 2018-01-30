@@ -1,5 +1,7 @@
 #include <Rcpp.h>
 #include <vector>
+#include <assert.h>
+
 using namespace Rcpp;
 
 
@@ -7,57 +9,90 @@ using namespace Rcpp;
 // [[Rcpp::depends(BH)]]
 #include <boost/math/special_functions/binomial.hpp>
 
-enum parnames {n, freq, prob};
-
-struct pars{
-  double z1,z2,k;
-};
-
-std::vector<std::array<double, 3>>::iterator it;
-
-double s(const double &n, const double &p, const pars &par){
-  return (((par.k)- n * p - n * (1 - p)) * (par.z1 - par.z2))/((par.k) + ((par.k) - n*p-n*(1-p))*(p*(par.z1 - par.z2)+ par.z2));
-}
-
-
-double n2(const double &n, const double &p, const pars &par){
-  if(n==0.0) return 0.0;
-  return static_cast<unsigned int>(n + n*((par.z1)*p+(par.z2)*(1.0-p))*(1.0-(n/(par.k))));
-}
-
-  
-void ItteratorNP(std::vector<std::array<double, 3> > &input, std::vector<std::array<double, 3> > &output, const pars &par){
-  output.clear();
-  for(it = input.begin(); it != input.end(); ++it){
-    std::array<double,3> pre, nex;
-    pre[n] = (*it)[n];
-    pre[freq] = (*it)[freq];
-    pre[prob] = (*it)[prob];
-    
-    nex[n] = n2(pre[n],pre[freq],par);
-    for(unsigned int i = 0; i < nex[n]; ++i){
-      double snow = s(pre[n], pre[freq], par);
-      nex[freq] = (double)i / nex[0];
-      nex[prob] = boost::math::binomial_coefficient<double>((int)nex[n], (double)i) * 
-        pow((-1.0 + pre[freq]) * (-1.0 + pre[freq] * snow), -i + nex[n]) * 
-        pow((pre[freq] - (-1.0 + pre[freq]) * pre[freq] * snow), (double)i);
-
-      output.push_back(nex);
-    }
-  }
+// [[Rcpp::export]]
+inline double s(const double &n, const double &p, const double &k, const double &z1, const double &z2){
+  return ((k - n)*(z1 - z2))/(k + k*p*z1 - n*p*z1 - (k-n)*(-1.0+p)*z2);
 }
 
 // [[Rcpp::export]]
-NumericVector Solve(double n1, double n2, double z1, double z2, double k) {
-  const struct pars par = {z1, z2, k};
+inline int n2(const double &n, const double &p, const double &k, const double &z1, const double &z2){
+  if(n==0.0) return 0.0;
   
-  std::vector<std::array<double,3 > > input, output;
-  std::array<double, 3> trial = {0.1,0.2, 0.4};
-  
-  input.push_back(trial);  
+  return static_cast<int>(n + n*((z1)*p+(z2)*(1.0-p))*(1.0-(n/(k))));
 
-  ItteratorNP(input, output, par);
-  
-  return 0;
 }
+
+// [[Rcpp::export]]
+NumericMatrix ItteratorNP(NumericMatrix input, const double &z1, const double &z2, const int &ngen ){
+  
+  int k = input.nrow();
+  NumericMatrix output(k,k);
+  
+  std::vector<std::vector<double>> invec(k, std::vector<double>(k));
+  std::vector<std::vector<double>> outvec(k, std::vector<double>(k,0.0));
+  
+  
+  for(int i = 0; i < k; ++i){
+    for(int j = 0; j < k; ++j){
+      invec[i][j] = input(i,j);
+    }
+  }
+  
+  for(int ngenit = 0 ; ngenit < ngen; ++ngenit){
+    for(int i = 0; i < k; ++i){
+      for(int j = 0; j < k; ++j){
+        if(invec[i][j] == 0.0) {continue;}
+        else{
+          int nnext = n2(i+j,(double)i/(double)(i+j),k, z1, z2);
+          double f = (double)i/(double)(i+j);
+          double snow = s(i+j, f, k, z1, z2);
+          for(int o = 0; o <= nnext; ++o){
+            outvec[o][nnext-o] += invec[i][j] * ((boost::math::binomial_coefficient<double>(nnext, o)) * 
+              pow(((-1.0 + f)*(-1.0 + f*snow)),(-o + nnext))* pow((f - (-1.0 + f)*f*snow),o));
+          }
+        }
+      }
+    }
+    
+    for(int i = 0; i < k; ++i){
+      for(int j = 0; j < k; ++j){
+        invec[i][j] = outvec[i][j];
+        outvec[i][j] = 0.0;
+      }
+    }   
+  }
+  
+  
+  for(int i = 0; i < k; ++i){
+    for(int j = 0; j < k; ++j){
+      output(i,j) = invec[i][j];
+    }
+  }
+  
+    
+  return output;
+}
+
+/*
+// [[Rcpp::export]]
+NumericMatrix Solve(const int n1, const int n2, const double z1, const double z2, const double k) {
+
+  std::vector<std::vector<double> > input(k, std::vector<double>(k,0.0));
+  std::vector<std::vector<double> > output(k, std::vector<double>(k,0.0));
+  
+  input[n1][n2] = 1.0;
+    
+  ItteratorNP(input, output, k, z1, z2);
+  
+  NumericMatrix outR(k, k);
+  
+  for(int i = 0; i < k; ++i){
+    for(int j = 0; j < k; ++j){
+      outR(i,j) = output[i][j];
+    }
+  }
+  
+  return outR;
+}
+ */
 
