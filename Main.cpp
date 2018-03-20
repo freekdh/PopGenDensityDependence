@@ -17,10 +17,10 @@ xx/xx/xxxx	:
 #include <math.h>
 #include <vector>
 #include <boost/dynamic_bitset.hpp>
+#include <boost/filesystem.hpp>
 #include <bitset>
 #include <math.h>
 #include <assert.h>
-#include <direct.h>
 #include <iomanip>
 #include <ctime>
 
@@ -37,9 +37,9 @@ typedef boost::dynamic_bitset<> dynamicbitset;
 
 class Individual {
 public:
-	Individual::Individual(const int &NLOCI, const int &type) : haplotype(NLOCI, type) { ; }
+	Individual(const int &NLOCI, const int &type) : haplotype(NLOCI, type) { ; }
 
-	Individual::Individual(const Individual &Parent1, const Individual &Parent2, dynamicbitset r_localbit, dynamicbitset m_localbit) {
+	Individual(const Individual &Parent1, const Individual &Parent2, dynamicbitset r_localbit, dynamicbitset m_localbit) {
 
 		dynamicbitset temp1 = Parent1.haplotype & r_localbit;
 		dynamicbitset temp2 = Parent2.haplotype & r_localbit.flip();
@@ -69,8 +69,7 @@ subpopulation::iterator it;
 std::vector<rnd::discrete_distribution>::iterator itdist;
 
 struct DataSet {
-
-	DataSet::DataSet(const int &NLOCI, const int &NGEN) : NLOCI(NLOCI), NGEN(NGEN) {
+	DataSet(const int &NLOCI, const int &NGEN) : NLOCI(NLOCI), NGEN(NGEN) {
 		// [NGEN][LOCUS][REP]
 		ploc.resize(NGEN, std::vector<std::vector<double>>(NLOCI, std::vector<double>()));
 		MetaOut.resize(NGEN, std::vector<std::vector<int>>(NLOCI, std::vector<int>(PACCURACY, 0)));
@@ -348,15 +347,16 @@ void OutputParameters(std::ofstream &ofstream, std::vector<rnd::discrete_distrib
 }
 
 void CreateOutputStreams(std::ofstream &ParametersOfstream, std::vector<std::ofstream> &MetaOfstream, std::vector<std::vector<std::ofstream>> &SubOfStream) {
-	std::string CurrentWorkingDirectory = "C:/Users/freek_000/Documents/PhD_Otto/AileneProject/PopGen_Ailene_2018/PopGen_Ailene_2018/DATA";
+	std::string CurrentWorkingDirectory = "/home/freek/PopGenDensityDependence/";
+	//std::string Current = boost::filesystem::current_path();
 	std::string MainOutputFolder = ReturnTimeStamp(CurrentWorkingDirectory);
 	std::string MetaOutputFolder = MainOutputFolder;
 	std::string SubOutputFolder = MainOutputFolder;
 	MetaOutputFolder.append("/MetaPopulation");
 	SubOutputFolder.append("/SubPopulations");
-	_mkdir(MainOutputFolder.c_str());
-	_mkdir(MetaOutputFolder.c_str());
-	_mkdir(SubOutputFolder.c_str());
+	boost::filesystem::create_directories(MainOutputFolder.c_str());
+	boost::filesystem::create_directories(MetaOutputFolder.c_str());
+	boost::filesystem::create_directories(SubOutputFolder.c_str());
 
 	ParametersOfstream.open(MainOutputFolder.append("/Parameters.csv"));
 
@@ -377,7 +377,7 @@ void CreateOutputStreams(std::ofstream &ParametersOfstream, std::vector<std::ofs
 		std::string focal = SubOutputFolder;
 		focal.append("/Sub");
 		focal = focal + std::to_string(sub);
-		_mkdir(focal.c_str());
+		boost::filesystem::create_directories(focal.c_str());
 		for (unsigned loc = 0; loc < SubOfStream[sub].size(); ++loc) {
 			std::string temp = focal;
 			temp.append("/Locus");
@@ -394,7 +394,7 @@ int main() {
 
 	/* PARAMETERS */
 	const double r = 0.5, k = 100.0, RECOMBINATIONRATE = 0.5, MUTATIONRATE = 0.00001;
-	const int NGEN = 30, NLOCI = 2, NHAPLOTYPES = 4, NREP = 200;
+	const int NGEN = 30, NLOCI = 2, NHAPLOTYPES = 4, NREP = 200; 
 	const double z[NHAPLOTYPES] = { 0.1, 0.1, 0.1, 0.1 };
 	std::vector<rnd::discrete_distribution*> Migrationdist;
 	MigrationMatrix(Migrationdist);
@@ -419,8 +419,7 @@ int main() {
 	Setrandombitset(r_globalbit, m_globalbit, MUTATIONRATE,RECOMBINATIONRATE);
 	OutputParameters(ParametersOfstream, Migrationdist, r, k, NGEN, NLOCI, NHAPLOTYPES, z);
 	DataSet Save(NLOCI,NGEN);
-	
-	/* SIMULATE */
+
 	for (int i = 0; i < NREP; ++i) {
 		subpopulation initialpop;
 		for (int i = 0; i < 15; ++i) {
