@@ -11,6 +11,9 @@ xx/xx/xxxx	:
 
 =============================================================================================================*/
 
+/// Serial founding events for migration.
+/// Deme x time x 'mean'-frequency
+
 #include "random.h"
 #include <fstream>
 #include <iostream>
@@ -24,22 +27,23 @@ xx/xx/xxxx	:
 #include <iomanip>
 #include <ctime>
 
-enum type { type1, type2 };
-enum fitness { logistic_r, logistic_k };
-enum direction {stay, left, right, up, down };
-
-const int NROW = 3;
-const int NCOL = 3;
-const int PACCURACY = 100;
-const int BITSETACCURACY = 1000;
-
+const int BITSETACCURACY = 100000;
 typedef boost::dynamic_bitset<> dynamicbitset;
+dynamicbitset r_globalbit, m_globalbit;
+std::vector<rnd::discrete_distribution>::iterator itdist;
 
 class Individual {
-public:
-	Individual(const int &NLOCI, const int &type) : haplotype(NLOCI, type) { ; }
+	public:
+	Individual(const int &NLOCI, const int &type) : haplotype(NLOCI, type) {}
 
-	Individual(const Individual &Parent1, const Individual &Parent2, dynamicbitset r_localbit, dynamicbitset m_localbit) {
+	Individual(const Individual &Parent1, const Individual &Parent2) {
+		
+		const int NLOCI = Parent1.haplotype.size();
+		assert(NLOCI == Parent2.haplotype.size());
+		
+		dynamicbitset m_localbit, r_localbit;
+		getbitsets(r_localbit,m_localbit,NLOCI);
+		assert(r_localbit.size() == Parent1.haplotype.size());
 
 		dynamicbitset temp1 = Parent1.haplotype & r_localbit;
 		dynamicbitset temp2 = Parent2.haplotype & r_localbit.flip();
@@ -52,24 +56,55 @@ public:
 	}
 
 	inline int haplotypeint() {
-		return haplotype.to_ulong();
+		int type = haplotype.to_ulong();
+		return type;
 	}
 
 	inline bool returnlocus(int locus) {
 		return haplotype[locus];
 	}
 
-private:
+	private:
 	boost::dynamic_bitset<> haplotype;
+
+	void getbitsets(dynamicbitset &r_localbit, dynamicbitset &m_localbit, const int &NLOCI) {
+		
+		r_localbit.resize(NLOCI);
+		m_localbit.resize(NLOCI);
+
+		int rand1, rand2;
+		do { rand1 = rnd::integer(BITSETACCURACY); } while (rand1 > BITSETACCURACY - NLOCI);
+		do { rand2 = rnd::integer(BITSETACCURACY); } while (rand1 > BITSETACCURACY - NLOCI);
+
+		for (int i = 0; i < NLOCI; ++i) {
+			r_localbit[i] = r_globalbit[rand1 + i];
+			m_localbit[i] = m_globalbit[rand2 + i];
+		}
+
+		assert(r_localbit.size() == NLOCI);
+		assert(m_localbit.size() == NLOCI);
+	}
 };
 
-typedef std::vector<Individual*> subpopulation;
+typedef std::vector<Individual*> Population;
+Population::iterator it;
 
-subpopulation::iterator it;
-std::vector<rnd::discrete_distribution>::iterator itdist;
+struct Parameters {
+	//default parameters
+	double RECOMBINATIONRATE = 0.5;
+	double MUTATIONRATE = 0.000001;
+	int NGEN = 100;
+	int NLOCI = 1;
+	int NREP = 1;
+	int NMETA = 1;
+	std::vector<double> r;
+	std::vector<double> k;
+	std::vector<int> NINIT;
+	std::vector<rnd::discrete_distribution*> Migrationdist;
+};
 
 struct DataSet {
-	DataSet(const int &NLOCI, const int &NGEN) : NLOCI(NLOCI), NGEN(NGEN) {
+	DataSet(Parameters* parspointer) : pars(parspointer) {
 		// [NGEN][LOCUS][REP]
 		ploc.resize(NGEN, std::vector<std::vector<double>>(NLOCI, std::vector<double>()));
 		MetaOut.resize(NGEN, std::vector<std::vector<int>>(NLOCI, std::vector<int>(PACCURACY, 0)));
@@ -78,15 +113,15 @@ struct DataSet {
 		MetaOutTotal.resize(NGEN, std::vector<double>(NLOCI, 0.0));
 	}
 
-	void AddMetaData(subpopulation Metapopulation[], const int &GEN) {
+	void AddMetaData(std::vector<Population> Metapopulation, const int &GEN) {
 
 		int sumpopsize = 0;
 		std::vector<int> nloc(NLOCI);	// [LOCUS]
 
-		for (int i = 0; i < NROW * NCOL; ++i) {
+		for (int i = 0; i < pars.NMETA; ++i) {
 			sumpopsize += Metapopulation[i].size();
 			for (it = Metapopulation[i].begin(); it < Metapopulation[i].end(); ++it) {
-				for (int j = 0; j < NLOCI; ++j) {
+				for (int j = 0; j < pars.NLOCI; ++j) {
 					nloc[j] += (int)(*it)->returnlocus(j);
 				}
 			}
@@ -101,7 +136,7 @@ struct DataSet {
 		}
 	}
 
-	void AddSubData(subpopulation Metapopulation[], const int &GEN) {
+	void AddSubData(std::vector<Population> Metapopulation, const int &GEN) {
 		for (int sub = 0; sub < NROW*NCOL; ++sub) {
 			int sumpopsize = Metapopulation[sub].size();
 			std::vector<int> nloc(NLOCI);
@@ -118,6 +153,7 @@ struct DataSet {
 					double temp = (double)nloc[loc] / (double)sumpopsize;
 					plocsub[sub][GEN][loc].push_back(temp);
 				}
+
 			}
 		}
 	}
@@ -174,9 +210,8 @@ struct DataSet {
 
 	}
 
-private:
-	const int NLOCI;
-	const int NGEN;
+	private:
+	const Parameters* pars;
 
 	std::vector<std::vector<std::vector<double>>> ploc;	// [NGEN][LOCUS][REP]
 	std::vector<std::vector<std::vector<int>>> MetaOut; // [NGEN][LOCUS][PACCURACY]
@@ -184,122 +219,83 @@ private:
 
 	std::vector<std::vector<std::vector<std::vector<double>>>> plocsub;	// [Sub][NGEN][LOCUS][REP]
 	std::vector<std::vector<std::vector<std::vector<int>>>>  SubOut;	//[Sub][NGEN][LOCUS][PACCURACY]
+
 };
 
-void Setrandombitset(dynamicbitset &recombit, dynamicbitset &mutationbit, const double &MUTATIONRATE, const double &RECOMBINATIONRATE) {
-	recombit.resize(BITSETACCURACY);
-	mutationbit.resize(BITSETACCURACY);
+void InitializeRandomBitsets(const double &MUTATIONRATE, const double &RECOMBINATIONRATE) {
+	r_globalbit.resize(BITSETACCURACY);
+	m_globalbit.resize(BITSETACCURACY);
 
 	for (int i = 0; i < BITSETACCURACY; ++i) {
-		mutationbit[i] = rnd::uniform() < MUTATIONRATE ? true : false;
+		m_globalbit[i] = rnd::uniform() < MUTATIONRATE ? true : false;
 	}
 
 	bool focal = rnd::bernoulli();
 	for (int i = 0; i < BITSETACCURACY; ++i) {
-		if (rnd::uniform() < RECOMBINATIONRATE) { focal = focal == true ? false : true; }
-		recombit[i] = focal;
+		if (rnd::uniform() < RECOMBINATIONRATE) { if(focal == true) {focal = false;} else {focal = true;};}
+		r_globalbit[i] = focal;
 	}
 
 }
 
-inline void PopulationbyType (subpopulation &pop, int types[], const int &NHAPLOTYPES) {
-	for (int i = 0; i < NHAPLOTYPES; ++i) {
-		types[i] = 0;
-	}
-	
-	for (it = pop.begin(); it != pop.end(); ++it) {
-		++types[(*it)->haplotypeint()];
-	}
-}
+void Mating(std::vector<Population> &Metapopulation, const Parameters &pars) {
+	assert(Metapopulation.size() == pars.NMETA);
+	std::vector<Population> MetapopulationAfter(pars.NMETA);
 
-void MigrationMatrix(std::vector<rnd::discrete_distribution*> &distarray) {
-	
-	const int NTOT = NROW * NCOL;	
-	for (int i = 0; i < NTOT; ++i) {
-		distarray.push_back(new rnd::discrete_distribution(NTOT));
-	}
-	
-	/* distarray */
-	for (int i = 0; i < NTOT; ++i) {
-		for (int j = 0; j < NTOT; ++j) {
-			(*distarray[i])[j] = 1.0;  // this does not make any sense now}
-		}
-	}
-}
-
-void getbitsets(dynamicbitset &r_localbit, dynamicbitset &m_localbit, const dynamicbitset &r_globalbit, const dynamicbitset &m_globalbit, const int &NLOCI) {
-	
-	r_localbit.resize(NLOCI);
-	m_localbit.resize(NLOCI);
-
-	int rand1, rand2;
-	do { rand1 = rnd::integer(BITSETACCURACY); } while (rand1 > BITSETACCURACY - NLOCI);
-	do { rand2 = rnd::integer(BITSETACCURACY); } while (rand1 > BITSETACCURACY - NLOCI);
-
-	for (int i = 0; i < NLOCI; ++i) {
-		r_localbit[i] = r_globalbit[rand1 + i];
-		m_localbit[i] = m_globalbit[rand2 + i];
-	}
-};
-
-void Mating(subpopulation Metapopulation[], const int &NLOCI, const int &NHAPLOTYPES, const dynamicbitset &r_globalbit, const dynamicbitset &m_globalbit, int n[], const double z[], const double &r, const double &k) {
-	subpopulation MetapopulationAfter[NROW*NCOL];
-
-	for (int pop = 0; pop < NCOL*NROW; ++pop) {
-			subpopulation focalBefore = Metapopulation[pop];
-			const int popsize = focalBefore.size();
-			PopulationbyType(focalBefore, n, NHAPLOTYPES);
-			for (it = focalBefore.begin(); it != focalBefore.end(); ++it) {
-				int nind = rnd::poisson((1.0 + (r * z[(*it)->haplotypeint()] * (1.0 - (double)popsize / k))));
-				for (int j = 0; j < nind; ++j) {
-					dynamicbitset r_localbit, m_localbit;
-					getbitsets(r_localbit, m_localbit, r_globalbit, m_globalbit,NLOCI);
-					MetapopulationAfter[pop].push_back(new Individual(**it, *focalBefore[rnd::integer(popsize)], r_localbit, m_localbit));
-				}
+	for (int i = 0; i < pars.NMETA; ++i) {
+		// Mating: determin nr of offspring -> randomly assign partner per offspring
+		Population FocalPopulation = Metapopulation[i];
+		const int FocalPopulationSize = FocalPopulation.size();
+		for (it = FocalPopulation.begin(); it != FocalPopulation.end(); ++it) {
+			int NOffspring = rnd::poisson((1.0 + (pars.r[(*it)->haplotypeint()] * (1.0 - (double)FocalPopulationSize / pars.k[(*it)->haplotypeint()]))));
+			for (int j = 0; j < NOffspring; ++j) {
+				MetapopulationAfter[i].push_back(new Individual(**it, *FocalPopulation[rnd::integer(FocalPopulationSize)]));
 			}
-			/*clear memory*/
-			for (it = focalBefore.begin(); it != focalBefore.end(); ++it) { delete *it; }
+		}
+		/*clear memory*/
+		for (it = FocalPopulation.begin(); it != FocalPopulation.end(); ++it) { delete *it; }
 	}
 	
-	for (int pop = 0; pop < NROW*NCOL; ++pop) {
-		Metapopulation[pop] = MetapopulationAfter[pop];
-	}
+	Metapopulation = MetapopulationAfter;
 } 
 
-void Migration(subpopulation Metapopulation[], const std::vector<rnd::discrete_distribution*> &distribution ) {
-	
-	subpopulation MetapopulationAfter[NROW*NCOL];
+void Migration(std::vector<Population> &Metapopulation, const Parameters &pars) {
+	assert(Metapopulation.size() == pars.NMETA);
+	std::vector<Population> MetapopulationAfter(pars.NMETA);
 
-	for (int i = 0; i < NROW*NCOL; ++i) {
-			subpopulation focalsubopulation = Metapopulation[i];
-			for (it = focalsubopulation.begin(); it < focalsubopulation.end(); ++it) {
-				int next = (*distribution[i]).sample();
+	for (int i = 0; i < Metapopulation.size(); ++i) {
+			for (it = Metapopulation[i].begin(); it < Metapopulation[i].end(); ++it) {
+				int next = (*pars.Migrationdist[i]).sample();
+				assert(0 <= next <= pars.NMETA);
 				MetapopulationAfter[next].push_back(*it);
 			}
 		}
 
-	for(int i = 0; i < NROW*NCOL; ++i) {
-		Metapopulation[i] = MetapopulationAfter[i];
-	}
+	Metapopulation = MetapopulationAfter;
+	assert(Metapopulation.size() == pars.NMETA);
 }
 
-void RunSimulation(subpopulation InitialMetapopulation[], const std::vector<rnd::discrete_distribution*> &MigrationMatrix, const dynamicbitset &r_globalbit, const dynamicbitset &m_globalbit, const int &NGEN, const int &NHAPLOTYPES, const int &NLOCI, int n[], const double z[], const double &r, const double &k, DataSet &Save) {
-	assert(NHAPLOTYPES > 0 && NHAPLOTYPES < 10);
+void RunSimulation(const Parameters &pars, DataSet &data) {
 
-	subpopulation FocalMetapopulation[NROW*NCOL];
-	for (int i = 0; i < NROW*NCOL; ++i) {
-		FocalMetapopulation[i] = InitialMetapopulation[i];
+	Population InitialPopulation;
+	for (int type = 0; type < pars.NINIT.size(); ++type) {
+		for(int n = 0; n < pars.NINIT[type]; ++n){
+			InitialPopulation.push_back(new Individual(pars.NLOCI, type));
+		}
 	}
 
-	for (int i = 0; i < NGEN; ++i) {
-		Save.AddMetaData(FocalMetapopulation,i);
-		Save.AddSubData(FocalMetapopulation, i);
+	std::vector<Population> FocalMetapopulation(pars.NMETA);
+	FocalMetapopulation[0] = InitialPopulation;
 
-		Migration(FocalMetapopulation, MigrationMatrix);
-		Mating(FocalMetapopulation, NLOCI, NHAPLOTYPES, r_globalbit, m_globalbit, n, z, r, k);
+	for (int i = 0; i < pars.NGEN; ++i) {
+		data.AddMetaData(FocalMetapopulation, i);
+		data.AddSubData(FocalMetapopulation, i);
+
+		Migration(FocalMetapopulation, pars.Migrationdist);
+		Mating(FocalMetapopulation, pars);
 	}
 
-	for (int i = 0; i < NROW*NCOL; ++i) {
+	for (int i = 0; i < FocalMetapopulation.size(); ++i) {
 		for (it = FocalMetapopulation[i].begin(); it != FocalMetapopulation[i].end(); ++it) { delete *it; }
 	}
 }
@@ -320,30 +316,31 @@ std::string ReturnTimeStamp(const std::string &CurrentDirectory) {
 	return out;
 }
 
-void OutputParameters(std::ofstream &ofstream, std::vector<rnd::discrete_distribution*> dist, const double &r, const double &k, const int &NGEN, const int &NLOCI, const int &NHAPLOTYPES, const double z[]) {
+void OutputParameters(std::ofstream &ofstream, const Parameters &pars) {
 	ofstream.fill(',');
-	ofstream << "r"					<< ofstream.fill() << r << std::endl;
-	ofstream << "k"					<< ofstream.fill() << k << std::endl;
-	for (int i = 0; i < NHAPLOTYPES; ++i) {
-		ofstream << "z" << i		<< ofstream.fill() << z[i] << std::endl;
+	ofstream << "r"					<< ofstream.fill() << pars.r << std::endl;
+	for (int i = 0; i < pars.r.size(); ++i) {
+		ofstream << "r" << i		<< ofstream.fill() << pars.r[i] << std::endl;
 	}
-	ofstream << "NGEN"				<< ofstream.fill() << NGEN << std::endl;
-	ofstream << "NLOCI"				<< ofstream.fill() << NLOCI << std::endl;
-	ofstream << "NHAPLOTYPES"		<< ofstream.fill() << NHAPLOTYPES << std::endl;
-	ofstream << "NROW"				<< ofstream.fill() << NROW << std::endl;
-	ofstream << "NCOL"				<< ofstream.fill() << NCOL << std::endl;
+	for (int i = 0; i < pars.k.size(); ++i) {
+		ofstream << "k" << i		<< ofstream.fill() << pars.k[i] << std::endl;
+	}
+	for (int i = 0; i < pars.NINIT.size(); ++i) {
+		ofstream << "NINIT" << i	<< ofstream.fill() << pars.NINIT[i] << std::endl;
+	}
+	ofstream << "NGEN"				<< ofstream.fill() << pars.NGEN << std::endl;
+	ofstream << "NLOCI"				<< ofstream.fill() << pars.NLOCI << std::endl;
+	ofstream << "NMETA"				<< ofstream.fill() << pars.NMETA << std::endl;
 
 	ofstream << std::endl << std::endl;
 	ofstream << "MigrationMatrix" << std::endl << std::endl;
 
-	for (unsigned int i = 0; i < dist.size(); ++i) {
-		for (int j = 0; j < dist[i]->size(); ++j) {
-			ofstream << (*dist[i])[j] << ofstream.fill();
+	for (unsigned int i = 0; i < pars.Migrationdist.size(); ++i) {
+		for (int j = 0; j < pars.Migrationdist[i]->size(); ++j) {
+			ofstream << (*pars.Migrationdist[i])[j] << ofstream.fill();
 		}
 		ofstream << std::endl;
 	}
-
-
 }
 
 void CreateOutputStreams(std::ofstream &ParametersOfstream, std::vector<std::ofstream> &MetaOfstream, std::vector<std::vector<std::ofstream>> &SubOfStream) {
@@ -392,50 +389,53 @@ void CreateOutputStreams(std::ofstream &ParametersOfstream, std::vector<std::ofs
 
 int main() {
 
-	/* PARAMETERS */
-	const double r = 0.5, k = 100.0, RECOMBINATIONRATE = 0.5, MUTATIONRATE = 0.00001;
-	const int NGEN = 30, NLOCI = 2, NHAPLOTYPES = 4, NREP = 200; 
-	const double z[NHAPLOTYPES] = { 0.1, 0.1, 0.1, 0.1 };
+	/* PARAMETERS HAPLOID SIMULATION */
+	Parameters pars;
+	
+	pars.RECOMBINATIONRATE = 0.5, pars.MUTATIONRATE = 0.00001;
+	pars.NGEN = 30, pars.NLOCI = 1, pars.NREP = 50, pars.NMETA = 1;
+	assert(pars.NMETA > 0); assert(pars.NREP > 0); assert(pars.NLOCI > 0); assert(pars.NGEN > 0);
+	
+	// growth: n1[t+1] = n1[t] + n1[t] z[1] (1 - (n1[t]+n2[t])/k) 
+	pars.r.push_back(0.1); pars.r.push_back(0.1);
+	pars.k.push_back(100.0); pars.k.push_back(100.0);
+	pars.NINIT.push_back(10); pars.NINIT.push_back(10);			
+	assert(pars.r.size() == pow(2,pars.NLOCI));
+	assert(pars.NINIT.size() == pow(2,pars.NLOCI));
+	assert(pars.k.size() == pow(2,pars.NLOCI));
+
 	std::vector<rnd::discrete_distribution*> Migrationdist;
-	MigrationMatrix(Migrationdist);
+	for (int i = 0; i < pars.NMETA; ++i) {
+		pars.Migrationdist.push_back(new rnd::discrete_distribution(pars.NMETA));
+		for (int j = 0; j < pars.NMETA; ++j) {
+			(*pars.Migrationdist[i])[j] = 1.0;
+		}
+	}
 
 	/* OFSTREAM */
 	std::ofstream ParametersOfstream;
-	std::vector<std::ofstream> MetaOfstream(NLOCI);
-	std::vector<std::vector<std::ofstream>> SubOfstream(NROW*NCOL);
-
-	for (int j = 0; j < NROW*NCOL; ++j) {
-		for (int i = 0; i < NLOCI; ++i) {
+	std::vector<std::ofstream> MetaOfstream(pars.NLOCI);
+	std::vector<std::vector<std::ofstream>> SubOfstream(pars.NMETA);
+	for (int j = 0; j < pars.NMETA; ++j) {
+		for (int i = 0; i < pars.NLOCI; ++i) {
 			SubOfstream[j].push_back(std::ofstream());
 		}
 	}
-
 	CreateOutputStreams(ParametersOfstream, MetaOfstream, SubOfstream);
-	assert(ParametersOfstream.is_open());
 
 	/* INITIALIZE */
 	rnd::set_seed();
-	dynamicbitset r_globalbit, m_globalbit;
-	Setrandombitset(r_globalbit, m_globalbit, MUTATIONRATE,RECOMBINATIONRATE);
-	OutputParameters(ParametersOfstream, Migrationdist, r, k, NGEN, NLOCI, NHAPLOTYPES, z);
-	DataSet Save(NLOCI,NGEN);
+	InitializeRandomBitsets(pars.MUTATIONRATE, pars.RECOMBINATIONRATE);
+	OutputParameters(ParametersOfstream, pars);
+	DataSet data(pars.NLOCI,pars.NGEN);
 
-	for (int i = 0; i < NREP; ++i) {
-		subpopulation initialpop;
-		for (int i = 0; i < 15; ++i) {
-			initialpop.push_back(new Individual(NLOCI, rnd::integer(NHAPLOTYPES)));
-		}
-		subpopulation initialmetapopulation[NROW*NCOL];
-		initialmetapopulation[0] = initialpop;
-
+	for (int i = 0; i < pars.NREP; ++i) {
 		std::cout << "Replicate: " << i << std::endl;
-
-		int n[NHAPLOTYPES];
-		RunSimulation(initialmetapopulation, Migrationdist, r_globalbit, m_globalbit, NGEN, NHAPLOTYPES, NLOCI, n, z, r, k, Save);
+		RunSimulation(pars, data);	// input, output
 	}
 
 	/* ANALYSIS */
-	Save.Analysis(MetaOfstream, SubOfstream);
+	data.Analysis(MetaOfstream, SubOfstream);
 	
 	return 0;
 }
