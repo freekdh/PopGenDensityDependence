@@ -105,121 +105,50 @@ struct Parameters {
 
 struct DataSet {
 	DataSet(Parameters* parspointer) : pars(parspointer) {
-		// [NGEN][LOCUS][REP]
-		ploc.resize(NGEN, std::vector<std::vector<double>>(NLOCI, std::vector<double>()));
-		MetaOut.resize(NGEN, std::vector<std::vector<int>>(NLOCI, std::vector<int>(PACCURACY, 0)));
-		SubOut.resize(NROW*NCOL, std::vector<std::vector<std::vector<int>>>(NGEN, std::vector<std::vector<int>>(NLOCI, std::vector<int>(PACCURACY, 0))));
-		plocsub.resize(NROW*NCOL, std::vector<std::vector<std::vector<double>>>(NGEN, std::vector<std::vector<double>>(NLOCI, std::vector<double>())));
-		MetaOutTotal.resize(NGEN, std::vector<double>(NLOCI, 0.0));
+		MetaCount.resize(pars->NGEN, std::vector<int>(pars->NLOCI,0));
+		PopCount.resize(pars->NGEN, std::vector<std::vector<int>>(pars->NLOCI, std::vector<int>(pars->NMETA,0)));
 	}
 
-	void AddMetaData(std::vector<Population> Metapopulation, const int &GEN) {
+	void AddCount(std::vector<Population> &MetaPopulation, const int &NGEN){
+		++counter;
 
-		int sumpopsize = 0;
-		std::vector<int> nloc(NLOCI);	// [LOCUS]
-
-		for (int i = 0; i < pars.NMETA; ++i) {
-			sumpopsize += Metapopulation[i].size();
-			for (it = Metapopulation[i].begin(); it < Metapopulation[i].end(); ++it) {
-				for (int j = 0; j < pars.NLOCI; ++j) {
-					nloc[j] += (int)(*it)->returnlocus(j);
+		for(int i = 0; i < pars->NLOCI; ++i){
+			// Sum over every population and every individual
+			for(int p = 0; p < MetaPopulation.size(); ++p){
+				for(it = MetaPopulation[p].begin(); it != MetaPopulation[p].end(); ++it){
+					if((*it)->returnlocus(i)) {++MetaCount[NGEN][i]; ++PopCount[NGEN][i][p];}
 				}
-			}
-		}
-
-		if (sumpopsize != 0) {
-			// Calculate p
-			for (int loc = 0; loc < NLOCI; ++loc) {
-				double temp = (double)nloc[loc] / (double)sumpopsize;
-				ploc[GEN][loc].push_back(temp);
-			}
-		}
-	}
-
-	void AddSubData(std::vector<Population> Metapopulation, const int &GEN) {
-		for (int sub = 0; sub < NROW*NCOL; ++sub) {
-			int sumpopsize = Metapopulation[sub].size();
-			std::vector<int> nloc(NLOCI);
-
-			for (it = Metapopulation[sub].begin(); it < Metapopulation[sub].end(); ++it) {
-				for (int j = 0; j < NLOCI; ++j) {
-					nloc[j] += (int)(*it)->returnlocus(j);
-				}
-			}
-		
-			if (sumpopsize != 0) {
-				// Calculate p
-				for (int loc = 0; loc < NLOCI; ++loc) {
-					double temp = (double)nloc[loc] / (double)sumpopsize;
-					plocsub[sub][GEN][loc].push_back(temp);
-				}
-
 			}
 		}
 	}
 
 	void Analysis(std::vector<std::ofstream> &MetaStream, std::vector<std::vector<std::ofstream>> &SubStream) {
 
-		// Metadata
-
-		 // [NGEN][LOCUS][PACCURACY]
-
-		for (int loc = 0; loc < NLOCI; ++loc) {
-			for (int gen = 0; gen < NGEN; ++gen) {
-				for (unsigned int i = 0; i < ploc[gen][loc].size(); ++i) {
-					double intpart, fracpart = modf(ploc[gen][loc][i], &intpart);
-					intpart = static_cast<int>(fracpart*PACCURACY);
-					++MetaOut[gen][loc][intpart];
-					++MetaOutTotal[gen][loc];
-				}
+		// Metadata [NGEN][NLOCUS]
+		for (int loc = 0; loc < pars->NLOCI; ++loc) {
+			for (int gen = 0; gen < pars-> NGEN; ++gen) {
+				MetaStream[loc] << MetaCount[gen][loc] << MetaStream[loc].fill();
 			}
+			MetaStream[loc] << std::endl;
 		}
 
-		for (int loc = 0; loc < NLOCI; ++loc) {
-			for (int gen = 0; gen < NGEN; ++gen) {
-				for (int i = 0; i < PACCURACY; ++i) {
-					MetaStream[loc] << (double)MetaOut[gen][loc][i] / MetaOutTotal[gen][loc] << MetaStream[loc].fill();
-				}
-				MetaStream[loc] << std::endl;
+		// Subdata [NGEN][NLOCUS][POP]
+		for (int sub = 0; sub < pars->NMETA; ++sub) {
+			for (int loc = 0; loc < pars->NLOCI; ++loc) {
+				for (int gen = 0; gen < pars->NGEN; ++gen) {
+					SubStream[sub][loc] << PopCount[gen][loc][sub] << SubStream[sub][loc].fill();
+				};
+				SubStream[sub][loc] << std::endl;
 			}
 		}
-
-		// Subdata
-		for (int sub = 0; sub < NROW*NCOL; ++sub) {
-			for (int loc = 0; loc < NLOCI; ++loc) {
-				for (int gen = 0; gen < NGEN; ++gen) {
-					for (unsigned int i = 0; i < plocsub[sub][gen][loc].size(); ++i) {
-						double intpart, fracpart = modf(plocsub[sub][gen][loc][i], &intpart);
-						intpart = static_cast<int>(fracpart*PACCURACY);
-						++SubOut[sub][gen][loc][intpart];
-					}
-				}
-			}
-		}
-
-		for (int sub = 0; sub < NROW*NCOL; ++sub) {
-			for (int loc = 0; loc < NLOCI; ++loc) {
-				for (int gen = 0; gen < NGEN; ++gen) {
-					for (int i = 0; i < PACCURACY; ++i) {
-						SubStream[sub][loc] << SubOut[sub][gen][loc][i] << SubStream[sub][loc].fill();
-					}
-					SubStream[sub][loc] << std::endl;
-				}
-			}
-		}
-
 	}
 
 	private:
 	const Parameters* pars;
+	int counter = 0;
 
-	std::vector<std::vector<std::vector<double>>> ploc;	// [NGEN][LOCUS][REP]
-	std::vector<std::vector<std::vector<int>>> MetaOut; // [NGEN][LOCUS][PACCURACY]
-	std::vector<std::vector<double>> MetaOutTotal;
-
-	std::vector<std::vector<std::vector<std::vector<double>>>> plocsub;	// [Sub][NGEN][LOCUS][REP]
-	std::vector<std::vector<std::vector<std::vector<int>>>>  SubOut;	//[Sub][NGEN][LOCUS][PACCURACY]
-
+	std::vector<std::vector<int>> MetaCount; // [NGEN][NLOCUS]
+	std::vector<std::vector<std::vector<int>>> PopCount; // [NGEN][NLOCUS][POP]
 };
 
 void InitializeRandomBitsets(const double &MUTATIONRATE, const double &RECOMBINATIONRATE) {
@@ -288,10 +217,9 @@ void RunSimulation(const Parameters &pars, DataSet &data) {
 	FocalMetapopulation[0] = InitialPopulation;
 
 	for (int i = 0; i < pars.NGEN; ++i) {
-		data.AddMetaData(FocalMetapopulation, i);
-		data.AddSubData(FocalMetapopulation, i);
+		data.AddCount(FocalMetapopulation, i);
 
-		Migration(FocalMetapopulation, pars.Migrationdist);
+		Migration(FocalMetapopulation, pars);
 		Mating(FocalMetapopulation, pars);
 	}
 
@@ -318,7 +246,7 @@ std::string ReturnTimeStamp(const std::string &CurrentDirectory) {
 
 void OutputParameters(std::ofstream &ofstream, const Parameters &pars) {
 	ofstream.fill(',');
-	ofstream << "r"					<< ofstream.fill() << pars.r << std::endl;
+	
 	for (int i = 0; i < pars.r.size(); ++i) {
 		ofstream << "r" << i		<< ofstream.fill() << pars.r[i] << std::endl;
 	}
@@ -412,7 +340,16 @@ int main() {
 		}
 	}
 
-	/* OFSTREAM */
+	/* SIMULATION */
+	rnd::set_seed();
+	InitializeRandomBitsets(pars.MUTATIONRATE, pars.RECOMBINATIONRATE);
+	DataSet data(&pars);
+	for (int i = 0; i < pars.NREP; ++i) {
+		std::cout << "Replicate: " << i << std::endl;
+		RunSimulation(pars, data);	// input, output
+	}
+
+	/* ANALYSIS */
 	std::ofstream ParametersOfstream;
 	std::vector<std::ofstream> MetaOfstream(pars.NLOCI);
 	std::vector<std::vector<std::ofstream>> SubOfstream(pars.NMETA);
@@ -422,19 +359,7 @@ int main() {
 		}
 	}
 	CreateOutputStreams(ParametersOfstream, MetaOfstream, SubOfstream);
-
-	/* INITIALIZE */
-	rnd::set_seed();
-	InitializeRandomBitsets(pars.MUTATIONRATE, pars.RECOMBINATIONRATE);
 	OutputParameters(ParametersOfstream, pars);
-	DataSet data(pars.NLOCI,pars.NGEN);
-
-	for (int i = 0; i < pars.NREP; ++i) {
-		std::cout << "Replicate: " << i << std::endl;
-		RunSimulation(pars, data);	// input, output
-	}
-
-	/* ANALYSIS */
 	data.Analysis(MetaOfstream, SubOfstream);
 	
 	return 0;
