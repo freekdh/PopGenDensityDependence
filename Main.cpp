@@ -4,7 +4,7 @@ Main.cpp
 
 Population genetics growth models
 
-Ailene McPearson and Freek de Haas
+A. McPearson, FJH de Haas & Prof. S.P. Otto
 
 Program version
 xx/xx/xxxx	:
@@ -325,7 +325,7 @@ int main() {
 	Parameters pars;
 	
 	pars.RECOMBINATIONRATE = 0.5, pars.MUTATIONRATE = 0.00001;
-	pars.NGEN = 200, pars.NLOCI = 1, pars.NREP = 10, pars.NMETA = 5;
+	pars.NGEN = 200, pars.NLOCI = 1, pars.NREP = 100, pars.NMETA = 50;
 	assert(pars.NMETA > 0); assert(pars.NREP > 0); assert(pars.NLOCI > 0); assert(pars.NGEN > 0);
 	
 	// growth: n1[t+1] = n1[t] + n1[t] z[1] (1 - (n1[t]+n2[t])/k) 
