@@ -1,8 +1,8 @@
 
 # ----- Define a function for plotting a matrix ----- #
 myImagePlot <- function(x, ...){
-     min <- min(x)
-     max <- max(x)
+     min <- 0
+     max <- 1
      yLabels <- rownames(x)
      xLabels <- colnames(x)
      title <-c()
@@ -34,19 +34,14 @@ myImagePlot <- function(x, ...){
     layout(matrix(data=c(1,2), nrow=1, ncol=2), widths=c(4,1), heights=c(1,1))
 
     # Red and green range from 0 to 1 while Blue ranges from 1 to 0
-    ColorRamp <- rgb( seq(0,1,length=256),  # Red
-                    seq(0,1,length=256),  # Green
-                    seq(1,0,length=256))  # Blue
+    ColorRamp <- rgb( seq(1,1,length=256),  # Red
+                    seq(1,0,length=256),  # Green
+                    seq(0,0,length=256))  # Blue
     ColorLevels <- seq(min, max, length=length(ColorRamp))
-
-    # Reverse Y axis
-    reverse <- nrow(x) : 1
-    yLabels <- yLabels[reverse]
-    x <- x[reverse,]
 
     # Data Map
     par(mar = c(3,5,2.5,2))
-    image(1:length(xLabels), 1:length(yLabels), t(x), col=ColorRamp, xlab="",
+    image(1:length(xLabels), 1:length(yLabels), t(x), col = ColorRamp, xlab="",
     ylab="", axes=FALSE, zlim=c(min,max))
     if( !is.null(title) ){
         title(main=title)
@@ -70,7 +65,7 @@ myImagePlot <- function(x, ...){
 
 list.data<-list()
 for(i in 0: 49){
-    file <- paste(getwd(), "R_test_data" , sep = "/")
+    file <- paste(getwd(), "26-03-2018-18-51-31" , sep = "/")
     file <- paste(file, "SubPopulations", sep = "/")
     file <- paste(file, "Sub", sep = "/")
     file <- paste(file, i, sep = "")
@@ -81,12 +76,11 @@ for(i in 0: 49){
     }
 
 B = matrix(
-    nrow = 199,
+    nrow = nrow(list.data[[1]]),
     ncol = 50
 )
 
 for(i in 1:50){
     B[,i] <- list.data[[i]]$Locus1 / (list.data[[i]]$Locus1 + list.data[[i]]$Locus2)
 }
-B[is.na(B)] <- 0
 myImagePlot(t(B))

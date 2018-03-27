@@ -325,11 +325,12 @@ int main() {
 	Parameters pars;
 	
 	pars.RECOMBINATIONRATE = 0.5, pars.MUTATIONRATE = 0.00001;
-	pars.NGEN = 200, pars.NLOCI = 1, pars.NREP = 100, pars.NMETA = 50;
+	pars.NGEN = 100, pars.NLOCI = 1, pars.NREP = 100, pars.NMETA = 50;
 	assert(pars.NMETA > 0); assert(pars.NREP > 0); assert(pars.NLOCI > 0); assert(pars.NGEN > 0);
 	
 	// growth: n1[t+1] = n1[t] + n1[t] z[1] (1 - (n1[t]+n2[t])/k) 
 	pars.r.resize(pow(2,pars.NLOCI),0.1);
+	pars.r[0] = 0.6;
 	pars.k.resize(pow(2,pars.NLOCI),100.0);
 	pars.NINIT.resize(pow(2,pars.NLOCI),10);		
 	assert(pars.r.size() == pow(2,pars.NLOCI));
