@@ -105,8 +105,10 @@ struct Parameters {
 
 struct DataSet {
 	DataSet(Parameters* parspointer) : pars(parspointer) {
-		MetaCount.resize(pars->NGEN, std::vector<int>(pars->NLOCI,0));
-		PopCount.resize(pars->NGEN, std::vector<std::vector<int>>(pars->NLOCI, std::vector<int>(pars->NMETA,0)));
+		MetaCount[0].resize(pars->NGEN, std::vector<int>(pars->NLOCI,0));
+		PopCount[0].resize(pars->NGEN, std::vector<std::vector<int>>(pars->NLOCI, std::vector<int>(pars->NMETA,0)));
+		MetaCount[1].resize(pars->NGEN, std::vector<int>(pars->NLOCI,0));
+		PopCount[1].resize(pars->NGEN, std::vector<std::vector<int>>(pars->NLOCI, std::vector<int>(pars->NMETA,0)));
 	}
 
 	void AddCount(std::vector<Population> &MetaPopulation, const int &NGEN){
@@ -116,7 +118,8 @@ struct DataSet {
 			// Sum over every population and every individual
 			for(int p = 0; p < MetaPopulation.size(); ++p){
 				for(it = MetaPopulation[p].begin(); it != MetaPopulation[p].end(); ++it){
-					if((*it)->returnlocus(i)) {++MetaCount[NGEN][i]; ++PopCount[NGEN][i][p];}
+					if((*it)->returnlocus(i)) {++MetaCount[0][NGEN][i]; ++PopCount[0][NGEN][i][p];}
+					else{++MetaCount[1][NGEN][i]; ++PopCount[1][NGEN][i][p];}
 				}
 			}
 		}
@@ -125,20 +128,18 @@ struct DataSet {
 	void Analysis(std::vector<std::ofstream> &MetaStream, std::vector<std::vector<std::ofstream>> &SubStream) {
 
 		// Metadata [NGEN][NLOCUS]
-		for (int loc = 0; loc < pars->NLOCI; ++loc) {
-			for (int gen = 0; gen < pars-> NGEN; ++gen) {
-				MetaStream[loc] << MetaCount[gen][loc] << MetaStream[loc].fill();
+		for (int gen = 0; gen < pars-> NGEN; ++gen) {
+			for (int loc = 0; loc < pars->NLOCI; ++loc) {
+				MetaStream[loc] << MetaCount[0][gen][loc] << MetaStream[loc].fill() << MetaCount[1][gen][loc] << std::endl;
 			}
-			MetaStream[loc] << std::endl;
 		}
 
 		// Subdata [NGEN][NLOCUS][POP]
 		for (int sub = 0; sub < pars->NMETA; ++sub) {
 			for (int loc = 0; loc < pars->NLOCI; ++loc) {
 				for (int gen = 0; gen < pars->NGEN; ++gen) {
-					SubStream[sub][loc] << PopCount[gen][loc][sub] << SubStream[sub][loc].fill();
+					SubStream[sub][loc] << PopCount[0][gen][loc][sub] << SubStream[sub][loc].fill() << PopCount[1][gen][loc][sub] << std::endl;
 				};
-				SubStream[sub][loc] << std::endl;
 			}
 		}
 	}
@@ -147,8 +148,8 @@ struct DataSet {
 	const Parameters* pars;
 	int counter = 0;
 
-	std::vector<std::vector<int>> MetaCount; // [NGEN][NLOCUS]
-	std::vector<std::vector<std::vector<int>>> PopCount; // [NGEN][NLOCUS][POP]
+	std::vector<std::vector<int>> MetaCount[2]; // [NGEN][NLOCUS]
+	std::vector<std::vector<std::vector<int>>> PopCount[2]; // [NGEN][NLOCUS][POP]
 };
 
 void InitializeRandomBitsets(const double &MUTATIONRATE, const double &RECOMBINATIONRATE) {
@@ -259,6 +260,9 @@ void OutputParameters(std::ofstream &ofstream, const Parameters &pars) {
 	ofstream << "NGEN"				<< ofstream.fill() << pars.NGEN << std::endl;
 	ofstream << "NLOCI"				<< ofstream.fill() << pars.NLOCI << std::endl;
 	ofstream << "NMETA"				<< ofstream.fill() << pars.NMETA << std::endl;
+	ofstream << "NREP" 				<< ofstream.fill() << pars.NREP << std::endl;
+	ofstream << "MUTATIONRATE" 		<< ofstream.fill() << pars.MUTATIONRATE << std::endl;
+	ofstream << "RECOMBINATIONRATE" << ofstream.fill() << pars.RECOMBINATIONRATE << std::endl;
 
 	ofstream << std::endl << std::endl;
 	ofstream << "MigrationMatrix" << std::endl << std::endl;
@@ -321,13 +325,13 @@ int main() {
 	Parameters pars;
 	
 	pars.RECOMBINATIONRATE = 0.5, pars.MUTATIONRATE = 0.00001;
-	pars.NGEN = 30, pars.NLOCI = 1, pars.NREP = 50, pars.NMETA = 1;
+	pars.NGEN = 200, pars.NLOCI = 1, pars.NREP = 10, pars.NMETA = 5;
 	assert(pars.NMETA > 0); assert(pars.NREP > 0); assert(pars.NLOCI > 0); assert(pars.NGEN > 0);
 	
 	// growth: n1[t+1] = n1[t] + n1[t] z[1] (1 - (n1[t]+n2[t])/k) 
-	pars.r.push_back(0.1); pars.r.push_back(0.1);
-	pars.k.push_back(100.0); pars.k.push_back(100.0);
-	pars.NINIT.push_back(10); pars.NINIT.push_back(10);			
+	pars.r.resize(pow(2,pars.NLOCI),0.1);
+	pars.k.resize(pow(2,pars.NLOCI),100.0);
+	pars.NINIT.resize(pow(2,pars.NLOCI),10);		
 	assert(pars.r.size() == pow(2,pars.NLOCI));
 	assert(pars.NINIT.size() == pow(2,pars.NLOCI));
 	assert(pars.k.size() == pow(2,pars.NLOCI));
@@ -336,8 +340,10 @@ int main() {
 	for (int i = 0; i < pars.NMETA; ++i) {
 		pars.Migrationdist.push_back(new rnd::discrete_distribution(pars.NMETA));
 		for (int j = 0; j < pars.NMETA; ++j) {
-			(*pars.Migrationdist[i])[j] = 1.0;
+			(*pars.Migrationdist[i])[j] = 0.0;
 		}
+		(*pars.Migrationdist[i])[i] = 1.0;
+		if(i != pars.NMETA) (*pars.Migrationdist[i])[i+1] = 1.0;
 	}
 
 	/* SIMULATION */
