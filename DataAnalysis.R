@@ -62,7 +62,7 @@ myImagePlot <- function(x, ...){
 
 list.data<-list()
 
-setwd(paste("/home/freek/PopGenDensityDependence/", "27-03-2018-18-16-33" , sep = "/"))
+setwd(paste("/home/freek/PopGenDensityDependence/", "28-03-2018-08-01-14" , sep = "/"))
     
 pars <- read.csv("Parameters.csv", nrows = 11, header = FALSE)
 colnames(pars) <- c("parameter", "value")
@@ -84,15 +84,30 @@ B = matrix(
     ncol = NMETA
 )
 
-########### PLOT WITH POPULATION SIZE ############
-
 for(i in 1:NMETA){
     B[,i] <- list.data[[i]]$Allele0 / (list.data[[i]]$Allele0 + list.data[[i]]$Allele1)
 }
 
-dev.off()
+########### PLOT WITH POPULATION SIZE ############
+
+for(i in 1:NMETA){
+    list.data[[i]]$Total <- list.data[[i]]$Allele0 + list.data[[i]]$Allele1
+    list.data[[i]]$Total[list.data[[i]]$Total == 0] <- NA
+}
+
+
+ColorRamp <- rgb( seq(1,1,length=256),  # Red
+                    seq(1,0,length=256),  # Green
+                    seq(0,0,length=256))  # Blue
+ColorLevels <- seq(min, max, length=length(ColorRamp))
+
+
 par(mfrow=c(1,1), mar = c(0,0,0,0))
-image(B)
+image(B,col = ColorRamp)
+text(0.1, 0.95, paste("r0 = ", pars$value[1]))
+text(0.1, 0.9, paste("r1 = ", pars$value[2]))
+text(0.1, 0.85, paste("k0 = ", pars$value[3]))
+text(0.1, 0.8, paste("k1 = ", pars$value[4]))
 par(mfrow=c(NMETA,1), mar = c(0,0,0,0), new = TRUE)
 for(i in 1:NMETA){
     par(mfg=c(i+1,1))

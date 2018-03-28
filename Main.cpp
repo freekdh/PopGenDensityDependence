@@ -340,19 +340,19 @@ void CreateOutputStreams(std::ofstream &ParametersOfstream, std::vector<std::ofs
 }
 
 int main(int argc, char **argv) {
-    if (argc != 10) return -1;
+    if (argc != 10) {std::cout << "Argc != 10" << std::endl; return -1;}
 
 	/* PARAMETERS HAPLOID SIMULATION */
 	Parameters pars;
 	
-	pars.r.resize(pow(2,pars.NLOCI),0.1);
-	pars.k.resize(pow(2,pars.NLOCI),100.0);
-	pars.NINIT.resize(pow(2,pars.NLOCI),10);	
+	pars.r.resize(pow(2,pars.NLOCI));
+	pars.k.resize(pow(2,pars.NLOCI));
+	pars.NINIT.resize(pow(2,pars.NLOCI));	
 
 	pars.r[0] = atof(argv[1]); assert(pars.r[0] > 0.0);
 	pars.r[1] = atof(argv[2]); assert(pars.r[1] > 0.0);
 	pars.k[0] = atof(argv[3]); assert(pars.k[0] > 0.0);
-	pars.k[2] = atof(argv[4]); assert(pars.k[1] > 0.0);
+	pars.k[1] = atof(argv[4]); assert(pars.k[1] > 0.0);
 	pars.NINIT[0] = atoi(argv[5]); assert(pars.NINIT[0] >= 0);
 	pars.NINIT[1] = atoi(argv[6]); assert(pars.NINIT[1] >= 0);
 	pars.NGEN = atoi(argv[7]); assert(pars.NGEN > 0);
