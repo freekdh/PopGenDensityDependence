@@ -40,12 +40,9 @@ myImagePlot <- function(x, ...){
     ColorLevels <- seq(min, max, length=length(ColorRamp))
 
     # Data Map
-    par(mar = c(3,5,2.5,2))
     image(1:length(xLabels), 1:length(yLabels), t(x), col = ColorRamp, xlab="",
     ylab="", axes=FALSE, zlim=c(min,max))
-    if( !is.null(title) ){
-        title(main=title)
-    }
+    
     axis(BELOW<-1, at=1:length(xLabels), labels=xLabels, cex.axis=0.7)
     axis(LEFT <-2, at=1:length(yLabels), labels=yLabels, las= HORIZONTAL<-1,
     cex.axis=0.7)
@@ -64,23 +61,42 @@ myImagePlot <- function(x, ...){
 # create an empty list that will serve as a container to receive the incoming files
 
 list.data<-list()
-for(i in 0: 49){
-    file <- paste(getwd(), "26-03-2018-18-51-31" , sep = "/")
-    file <- paste(file, "SubPopulations", sep = "/")
-    file <- paste(file, "Sub", sep = "/")
-    file <- paste(file, i, sep = "")
-    file <- paste(file, "Locus0.csv", sep = "/")
 
-    list.data[[i+1]]<-read.csv(file)
-    colnames(list.data[[i+1]]) <- c("Locus1", "Locus2")
-    }
+setwd(paste("/home/freek/PopGenDensityDependence/", "27-03-2018-18-16-33" , sep = "/"))
+    
+pars <- read.csv("Parameters.csv", nrows = 11, header = FALSE)
+colnames(pars) <- c("parameter", "value")
+
+NMETA = pars$value[9]
+
+for(i in 0: (NMETA-1)){
+    datasub <- paste(getwd(), "SubPopulations", sep = "/")
+    datasub <- paste(datasub, "Sub", sep = "/")
+    datasub <- paste(datasub, i, sep = "")
+
+    datasub <- paste(datasub, "Locus0.csv", sep = "/")
+    list.data[[i+1]]<-read.csv(datasub, header = FALSE)
+    colnames(list.data[[i+1]]) <- c("Allele0", "Allele1")
+}
 
 B = matrix(
     nrow = nrow(list.data[[1]]),
-    ncol = 50
+    ncol = NMETA
 )
 
-for(i in 1:50){
-    B[,i] <- list.data[[i]]$Locus1 / (list.data[[i]]$Locus1 + list.data[[i]]$Locus2)
+########### PLOT WITH POPULATION SIZE ############
+
+for(i in 1:NMETA){
+    B[,i] <- list.data[[i]]$Allele0 / (list.data[[i]]$Allele0 + list.data[[i]]$Allele1)
 }
-myImagePlot(t(B))
+
+dev.off()
+par(mfrow=c(1,1), mar = c(0,0,0,0))
+image(B)
+par(mfrow=c(NMETA,1), mar = c(0,0,0,0), new = TRUE)
+for(i in 1:NMETA){
+    par(mfg=c(i+1,1))
+    plot(list.data[[NMETA-i]]$Total, type = 'l',xaxt='n', yaxt='n', xaxs = "i",yaxs="i" , lwd = 2,
+    ylim = c(0,1.15*max(pars$value[3], pars$value[4])*pars$value[10]),
+    bty="n")
+}

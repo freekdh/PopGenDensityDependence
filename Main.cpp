@@ -25,6 +25,7 @@ xx/xx/xxxx	:
 #include <math.h>
 #include <assert.h>
 #include <iomanip>
+#include <algorithm>
 #include <ctime>
 
 const int BITSETACCURACY = 100000;
@@ -176,12 +177,31 @@ void Mating(std::vector<Population> &Metapopulation, const Parameters &pars) {
 		// Mating: determin nr of offspring -> randomly assign partner per offspring
 		Population FocalPopulation = Metapopulation[i];
 		const int FocalPopulationSize = FocalPopulation.size();
-		for (it = FocalPopulation.begin(); it != FocalPopulation.end(); ++it) {
-			int NOffspring = rnd::poisson((1.0 + (pars.r[(*it)->haplotypeint()] * (1.0 - (double)FocalPopulationSize / pars.k[(*it)->haplotypeint()]))));
-			for (int j = 0; j < NOffspring; ++j) {
-				MetapopulationAfter[i].push_back(new Individual(**it, *FocalPopulation[rnd::integer(FocalPopulationSize)]));
+
+		// Create gametes (haploid case)
+		Population gametes;
+		for (it = FocalPopulation.begin(); it != FocalPopulation.end(); ++it) { 
+			double temp = 1.0 + pars.r[(*it)->haplotypeint()] * (1.0 - (double)FocalPopulationSize / pars.k[(*it)->haplotypeint()]);
+			if(temp < 0.0) {std::cout << "temp = " << temp << "  " << "ERROR -growthrate below 0.0-" << std::endl; temp = 0.0; };
+			int ngametes = rnd::poisson(temp);
+			for(int k = 0; k < ngametes; ++k){
+				gametes.push_back(*it);
 			}
 		}
+
+		const int NNEXT = gametes.size();
+		std::random_shuffle(gametes.begin(), gametes.end());
+	
+		if(NNEXT > 1){
+			for (int j = 0; j < NNEXT-1; ++j) {
+				MetapopulationAfter[i].push_back(new Individual(*gametes[j], *gametes[j+1]));
+			}
+			MetapopulationAfter[i].push_back(new Individual(*gametes[0],*gametes[NNEXT-1]));
+		}
+		else if(NNEXT == 1){
+				MetapopulationAfter[i].push_back(new Individual(*gametes[0],*gametes[0]));
+			}
+
 		/*clear memory*/
 		for (it = FocalPopulation.begin(); it != FocalPopulation.end(); ++it) { delete *it; }
 	}
@@ -325,14 +345,19 @@ int main() {
 	Parameters pars;
 	
 	pars.RECOMBINATIONRATE = 0.5, pars.MUTATIONRATE = 0.00001;
-	pars.NGEN = 100, pars.NLOCI = 1, pars.NREP = 100, pars.NMETA = 50;
+	pars.NGEN = 500, pars.NLOCI = 1, pars.NREP = 10, pars.NMETA = 20;
 	assert(pars.NMETA > 0); assert(pars.NREP > 0); assert(pars.NLOCI > 0); assert(pars.NGEN > 0);
 	
-	// growth: n1[t+1] = n1[t] + n1[t] z[1] (1 - (n1[t]+n2[t])/k) 
+	// growth: n1[t+1] = n1[t] + n1[t] r[1] (1 - (n1[t]+n2[t])/k) 
 	pars.r.resize(pow(2,pars.NLOCI),0.1);
-	pars.r[0] = 0.6;
+	pars.r[0] = 0.1;
+	pars.r[0] = 0.1;
 	pars.k.resize(pow(2,pars.NLOCI),100.0);
-	pars.NINIT.resize(pow(2,pars.NLOCI),10);		
+	pars.k[0] = 100.0;
+	pars.k[1] = 100.0;
+	pars.NINIT.resize(pow(2,pars.NLOCI),10);
+	pars.NINIT[0] = 10;
+	pars.NINIT[1] = 10;		
 	assert(pars.r.size() == pow(2,pars.NLOCI));
 	assert(pars.NINIT.size() == pow(2,pars.NLOCI));
 	assert(pars.k.size() == pow(2,pars.NLOCI));
@@ -343,8 +368,8 @@ int main() {
 		for (int j = 0; j < pars.NMETA; ++j) {
 			(*pars.Migrationdist[i])[j] = 0.0;
 		}
-		(*pars.Migrationdist[i])[i] = 1.0;
-		if(i != pars.NMETA) (*pars.Migrationdist[i])[i+1] = 1.0;
+		(*pars.Migrationdist[i])[i] = pars.k[0]-.1;
+		if(i != pars.NMETA) (*pars.Migrationdist[i])[i+1] = .1;
 	}
 
 	/* SIMULATION */
