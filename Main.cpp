@@ -339,28 +339,28 @@ void CreateOutputStreams(std::ofstream &ParametersOfstream, std::vector<std::ofs
 	}
 }
 
-int main() {
+int main(int argc, char **argv) {
+    if (argc != 10) return -1;
 
 	/* PARAMETERS HAPLOID SIMULATION */
 	Parameters pars;
 	
-	pars.RECOMBINATIONRATE = 0.5, pars.MUTATIONRATE = 0.00001;
-	pars.NGEN = 500, pars.NLOCI = 1, pars.NREP = 10, pars.NMETA = 20;
-	assert(pars.NMETA > 0); assert(pars.NREP > 0); assert(pars.NLOCI > 0); assert(pars.NGEN > 0);
-	
-	// growth: n1[t+1] = n1[t] + n1[t] r[1] (1 - (n1[t]+n2[t])/k) 
 	pars.r.resize(pow(2,pars.NLOCI),0.1);
-	pars.r[0] = 0.1;
-	pars.r[0] = 0.1;
 	pars.k.resize(pow(2,pars.NLOCI),100.0);
-	pars.k[0] = 100.0;
-	pars.k[1] = 100.0;
-	pars.NINIT.resize(pow(2,pars.NLOCI),10);
-	pars.NINIT[0] = 10;
-	pars.NINIT[1] = 10;		
-	assert(pars.r.size() == pow(2,pars.NLOCI));
-	assert(pars.NINIT.size() == pow(2,pars.NLOCI));
-	assert(pars.k.size() == pow(2,pars.NLOCI));
+	pars.NINIT.resize(pow(2,pars.NLOCI),10);	
+
+	pars.r[0] = atof(argv[1]); assert(pars.r[0] > 0.0);
+	pars.r[1] = atof(argv[2]); assert(pars.r[1] > 0.0);
+	pars.k[0] = atof(argv[3]); assert(pars.k[0] > 0.0);
+	pars.k[2] = atof(argv[4]); assert(pars.k[1] > 0.0);
+	pars.NINIT[0] = atoi(argv[5]); assert(pars.NINIT[0] >= 0);
+	pars.NINIT[1] = atoi(argv[6]); assert(pars.NINIT[1] >= 0);
+	pars.NGEN = atoi(argv[7]); assert(pars.NGEN > 0);
+	pars.NREP = atoi(argv[8]); assert(pars.NREP > 0);
+	pars.NMETA = atoi(argv[9]); assert(pars.NMETA > 0);
+
+	pars.RECOMBINATIONRATE = 0.5, pars.MUTATIONRATE = 0.00001; pars.NLOCI = 1;
+	assert(pars.NLOCI > 0);
 
 	std::vector<rnd::discrete_distribution*> Migrationdist;
 	for (int i = 0; i < pars.NMETA; ++i) {
