@@ -295,10 +295,11 @@ void OutputParameters(std::ofstream &ofstream, const Parameters &pars) {
 	}
 }
 
-void CreateOutputStreams(std::ofstream &ParametersOfstream, std::vector<std::ofstream> &MetaOfstream, std::vector<std::vector<std::ofstream>> &SubOfStream) {
-	std::string CurrentWorkingDirectory = "/home/freek/PopGenDensityDependence/";
+std::string CreateOutputStreams(std::ofstream &ParametersOfstream, std::vector<std::ofstream> &MetaOfstream, std::vector<std::vector<std::ofstream>> &SubOfStream) {
+	std::string CurrentWorkingDirectory = "/home/freek/PopGenDensityDependence";
 	//std::string Current = boost::filesystem::current_path();
 	std::string MainOutputFolder = ReturnTimeStamp(CurrentWorkingDirectory);
+	std::string returnmainfolder = MainOutputFolder;
 	std::string MetaOutputFolder = MainOutputFolder;
 	std::string SubOutputFolder = MainOutputFolder;
 	MetaOutputFolder.append("/MetaPopulation");
@@ -337,6 +338,8 @@ void CreateOutputStreams(std::ofstream &ParametersOfstream, std::vector<std::ofs
 			SubOfStream[sub][loc].fill(',');
 		}
 	}
+
+	return returnmainfolder;
 }
 
 int main(int argc, char **argv) {
@@ -390,9 +393,16 @@ int main(int argc, char **argv) {
 			SubOfstream[j].push_back(std::ofstream());
 		}
 	}
-	CreateOutputStreams(ParametersOfstream, MetaOfstream, SubOfstream);
+
+	// Run R script to make plots
+	std::string FolderName = CreateOutputStreams(ParametersOfstream, MetaOfstream, SubOfstream);
+	std::string RCommand = "Rscript DataAnalysisAutomated.R ";
 	OutputParameters(ParametersOfstream, pars);
 	data.Analysis(MetaOfstream, SubOfstream);
 	
+	std::cout << RCommand.append(FolderName) << std::endl;
+
+	system(RCommand.c_str());
+
 	return 0;
 }
