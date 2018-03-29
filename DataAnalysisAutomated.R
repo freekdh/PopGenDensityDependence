@@ -1,3 +1,5 @@
+# SCRIPT LINKED TO C++ SIMULATIONS
+
 args <- commandArgs(trailingOnly = TRUE)
 Foldername <- args[1]
 
@@ -50,9 +52,8 @@ text(0.1, 0.8, paste("k1 = ", pars$value[4]))
 par(mfrow=c(NMETA,1), mar = c(0,0,0,0), new = TRUE)
 for(i in 1:NMETA-1){
     par(mfg=c(i+1,1))
-    plot(list.data[[NMETA-i]]$Total, type = 'l',xaxt='n', yaxt='n', xaxs = "i",yaxs="i" , lwd = 2,
+    plot(list.data[[NMETA-i]]$Total, type = 'l',xaxt='n', yaxt='n', xaxs = "i",yaxs="i" , lwd = 3,
     ylim = c(0,1.15*max(pars$value[3], pars$value[4])*pars$value[10]),
     bty="n")
 }
 dev.off()
-
