@@ -1,6 +1,6 @@
 # Data Analysis plot
 
-setwd("/home/freek/PopGenDensityDependence/28-03-2018-12-13-08")
+setwd("/home/freek/PopGenDensityDependence/29-03-2018-11-59-39")
 library(grid)
 library(gridGraphics)
 library(gtable)
@@ -47,25 +47,28 @@ ColorRamp <- rgb( seq(1,1,length=256),  # Red
 ColorLevels <- seq(0, 1, length=length(ColorRamp))
 
 
-par(mfrow=c(1,1), cex=1.5 , mar = c(0,0,0,0))
-image(1:nrow(B),1:ncol(B),B,col = ColorRamp)
-legend("topleft", legend = c(paste("r0 = ", pars$value[1]),
-                            paste("r1 = ",pars$value[2]),
-                            paste("k0 = ", pars$value[3]),
-                            paste("k1 = ",pars$value[4]),
-                            paste("n01 = ",pars$value[5]),
-                            paste("n02 = ",pars$value[6]),
-                            paste("rep = ", pars$value[10])), 
-                  bty = "n")
-par(mfrow=c(NMETA,1), mar = c(0,0,0,0))
-for(i in 1:NMETA-1){
-    par(mfg=c(i+1,1))
-    plot(list.data[[NMETA-i]]$Total, type = 'l',xaxt='n', yaxt='n', xaxs = "i",yaxs="i" , lwd = 3,
-    ylim = c(0,1.05*max(pars$value[3], pars$value[4])*pars$value[10]),
-    bty="n")
-}
+grid.echo(
+    {
+    par(mfrow=c(1,1), cex=1.5 , mar = c(0,0,0,0))
+    image(1:nrow(B),1:ncol(B),B,col = ColorRamp)
+    legend("topleft", legend = c(paste("r0 = ", pars$value[1]),
+                                paste("r1 = ",pars$value[2]),
+                                paste("k0 = ", pars$value[3]),
+                                paste("k1 = ",pars$value[4]),
+                                paste("n01 = ",pars$value[5]),
+                                paste("n02 = ",pars$value[6]),
+                                paste("rep = ", pars$value[10])), 
+                    bty = "n")
+    par(mfrow=c(NMETA,1), mar = c(0,0,0,0))
+    for(i in 1:NMETA-1){
+        par(mfg=c(i+1,1))
+        plot(list.data[[NMETA-i]]$Total, type = 'l',xaxt='n', yaxt='n', xaxs = "i",yaxs="i" , lwd = 3,
+        ylim = c(0,1.05*max(pars$value[3], pars$value[4])*pars$value[10]),
+        bty="n")
+    }
+    }
+)
 
-grid.echo()
 a <- grid.grab()
 grid.newpage()
 pushViewport(viewport(y=0.08, height = .9, width = .825, just = "bottom"))
